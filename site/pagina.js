@@ -23,6 +23,8 @@ const elementos = {
   largura: $('largura'), formato: $('formato'), qualidade: $('qualidade'),
   campoQualidade: $('campoQualidade'), nome: $('nome'),
   papelHex: $('papelHex'), papelMostra: $('papelMostra'),
+  modo: $('modo'), tolerancia: $('tolerancia'), suavidade: $('suavidade'), resto: $('resto'),
+  rotuloPapel: $('rotuloPapel'),
   btPapelAuto: $('btPapelAuto'), btConta: $('btConta'),
   btGravar: $('btGravar'), btOutra: $('btOutra'), btLarguraCheia: $('btLarguraCheia'),
 };
@@ -99,8 +101,12 @@ function desenharAntes() {
 
 function parametros() {
   return {
+    modo: elementos.modo.value,
     limpar: Number(elementos.limpar.value),
     ganho: Number(elementos.ganho.value),
+    tolerancia: Number(elementos.tolerancia.value),
+    suavidade: Number(elementos.suavidade.value),
+    resto: Number(elementos.resto.value) / 100,
     saturacao: Number(elementos.saturacao.value) / 100,
     aparar: elementos.aparar.checked,
     limiar: Number(elementos.limiarCorte.value),
@@ -112,9 +118,7 @@ function parametros() {
 function processar(imagem, p, margemEmEscala = 1) {
   const { data, width: L, height: A } = imagem;
   const papel = estado.papelManual ?? estado.papelAuto;
-  const { rgba, estatisticas } = separar(data, L, A, {
-    papel, limpar: p.limpar, ganho: p.ganho,
-  });
+  const { rgba, estatisticas } = separar(data, L, A, { ...p, papel });
   saturar(rgba, p.saturacao);
   const corte = p.aparar
     ? aparar(rgba, L, A, {
@@ -190,9 +194,8 @@ function medirCorteExato(p) {
   estado.medindo = setTimeout(() => {
     const { data, width: L, height: A } = estado.cheia;
     const caixa = caixaNaOrigem(data, L, A, {
+      ...p,
       papel: estado.papelManual ?? estado.papelAuto,
-      limpar: p.limpar,
-      ganho: p.ganho,
       limiar: p.limiar,
     });
     if (!caixa) return;
@@ -338,6 +341,9 @@ const rotulos = [
   ['limiarCorte', 'vLimiarCorte', (v) => v],
   ['margemCorte', 'vMargemCorte', (v) => `${v} px`],
   ['qualidade', 'vQualidade', (v) => v],
+  ['tolerancia', 'vTolerancia', (v) => v],
+  ['suavidade', 'vSuavidade', (v) => v],
+  ['resto', 'vResto', (v) => `${v}%`],
 ];
 
 for (const [alvo, saida, formatar] of rotulos) {
@@ -346,6 +352,19 @@ for (const [alvo, saida, formatar] of rotulos) {
   el.addEventListener('input', () => { atualizar(); aplicar(); });
   atualizar();
 }
+
+// Cada modo mostra só os seus controles: ganho e limpar não significam nada
+// contra fundo chapado, e tolerância não significa nada sobre papel.
+function trocarModo() {
+  const modo = elementos.modo.value;
+  for (const campo of document.querySelectorAll('[data-modo]')) {
+    campo.hidden = campo.dataset.modo !== modo;
+  }
+  elementos.rotuloPapel.textContent = modo === 'chapado' ? 'Cor do fundo' : 'Papel';
+  aplicar();
+}
+elementos.modo.addEventListener('change', trocarModo);
+trocarModo();
 
 elementos.aparar.addEventListener('change', aplicar);
 elementos.largura.addEventListener('input', () => {

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Tira o papel de uma aquarela, preservando as aguadas.
+"""Tira o fundo de uma ilustração, preservando as aguadas.
 
 Não é recorte de fundo. Uma aquarela é pigmento translúcido *sobre* papel:
 o que se vê em cada ponto é uma mistura entre a tinta e o papel por baixo.
@@ -55,26 +55,89 @@ def estimar_papel(pixels: np.ndarray, margem: int = 6) -> np.ndarray:
     return np.median(bordas, axis=0)
 
 
+def cobertura_aquarela(
+    pixels: np.ndarray, papel: np.ndarray, limpar: float, ganho: float,
+) -> np.ndarray:
+    """Cobertura de tinta translúcida sobre papel claro.
+
+    A tinta só escurece o papel, então a cobertura sai do canal que mais
+    escureceu, em proporção à folga que havia até o preto.
+    """
+    papel_seguro = np.maximum(papel, 1.0)
+    escurecimento = (papel - pixels) / papel_seguro
+    cobertura = np.clip(escurecimento.max(axis=2) * ganho, 0.0, 1.0)
+    # Ruído de compressão perto do papel vira transparência limpa.
+    cobertura[cobertura < limpar] = 0.0
+    return cobertura
+
+
+def cobertura_chapada(
+    pixels: np.ndarray, fundo: np.ndarray, tolerancia: float, suavidade: float,
+) -> np.ndarray:
+    """Cobertura contra um fundo de cor chapada.
+
+    Aqui o fundo não é papel por baixo da tinta: é uma cor atrás de um desenho
+    que costuma ser opaco. O que separa os dois é a *distância de cor*, não o
+    escurecimento — um cinza neutro está longe de um verde mesmo tendo brilho
+    parecido, e é justamente isso que a medida por canal não enxerga. Sem isto,
+    um desenho claro sobre fundo colorido some, e as sombras neutras voltam
+    tingidas do complementar do fundo.
+    """
+    distancia = np.sqrt(((pixels - fundo) ** 2).sum(axis=2))
+    return np.clip((distancia - tolerancia) / max(suavidade, 1.0), 0.0, 1.0)
+
+
+def tirar_resto_do_fundo(
+    pigmento: np.ndarray, fundo: np.ndarray, cobertura: np.ndarray, forca: float,
+) -> np.ndarray:
+    """Tira das bordas o resto do matiz do fundo.
+
+    Num pixel de transição parte do que se vê é fundo, e quando a cobertura é
+    subestimada sobra matiz: a franja verde na borda de um desenho sobre verde.
+    Remove-se do pigmento a componente de cor que aponta na direção do matiz do
+    fundo, deixando o brilho intacto.
+
+    A remoção é proporcional a `1 - cobertura`, e é isso que a torna segura: onde
+    a tinta é cheia não há fundo por baixo, e um ocre — que legitimamente contém
+    verde — sairia rosa se fosse tratado como franja.
+    """
+    if forca <= 0:
+        return pigmento
+    direcao = fundo - fundo.mean()          # a cor do fundo sem o brilho dela
+    # Raiz da soma dos quadrados: np.linalg.norm escalona e nao casaria com o
+    # nucleo do navegador no ultimo bit.
+    norma = float(np.sqrt((direcao ** 2).sum()))
+    if norma < 1e-6:                        # fundo neutro: não há matiz a tirar
+        return pigmento
+    direcao = direcao / norma
+    cinza = pigmento.mean(axis=2, keepdims=True)
+    excesso = np.maximum(((pigmento - cinza) * direcao).sum(axis=2, keepdims=True), 0.0)
+    peso = (1.0 - cobertura)[..., None] * forca
+    return np.clip(pigmento - direcao * excesso * peso, 0, 255)
+
+
 def separar(
     pixels: np.ndarray,
     papel: np.ndarray,
-    limpar: float,
-    ganho: float,
+    limpar: float = 0.02,
+    ganho: float = 1.0,
+    modo: str = 'aquarela',
+    tolerancia: float = 30.0,
+    suavidade: float = 60.0,
+    resto: float = 0.0,
 ) -> tuple[np.ndarray, np.ndarray]:
-    papel_seguro = np.maximum(papel, 1.0)
-
-    # Quanto cada canal escureceu em relação ao papel, em proporção.
-    escurecimento = (papel - pixels) / papel_seguro
-    cobertura = np.clip(escurecimento.max(axis=2) * ganho, 0.0, 1.0)
-
-    # Ruído de compressão perto do papel vira transparência limpa.
-    cobertura[cobertura < limpar] = 0.0
+    cobertura = (
+        cobertura_chapada(pixels, papel, tolerancia, suavidade)
+        if modo == 'chapado'
+        else cobertura_aquarela(pixels, papel, limpar, ganho)
+    )
 
     a = cobertura[..., None]
     with np.errstate(divide='ignore', invalid='ignore'):
         pigmento = (pixels - papel * (1.0 - a)) / a
     pigmento = np.nan_to_num(pigmento, nan=0.0, posinf=255.0, neginf=0.0)
-    return np.clip(pigmento, 0, 255), cobertura
+    pigmento = np.clip(pigmento, 0, 255)
+    return tirar_resto_do_fundo(pigmento, papel, cobertura, resto), cobertura
 
 
 def aparar(rgba: np.ndarray) -> np.ndarray:
@@ -111,13 +174,45 @@ def main() -> None:
         help='Multiplica a cobertura. Acima de 1 deixa a tinta mais densa. Padrão: 1.0.',
     )
     parser.add_argument('--aparar', action='store_true', help='Corta as margens transparentes.')
+    parser.add_argument(
+        '--modo',
+        choices=('aquarela', 'chapado'),
+        default='aquarela',
+        help='"aquarela": tinta translúcida sobre papel claro (padrão). '
+             '"chapado": fundo de cor chapada atrás de um desenho opaco — use '
+             'quando o desenho puder ser mais claro que o fundo.',
+    )
+    parser.add_argument(
+        '--tolerancia',
+        type=float,
+        default=30.0,
+        help='Só no modo chapado: distância de cor abaixo da qual o pixel é '
+             'fundo puro. Padrão: 30.',
+    )
+    parser.add_argument(
+        '--suavidade',
+        type=float,
+        default=60.0,
+        help='Só no modo chapado: largura da rampa acima da tolerância, onde a '
+             'borda ganha transparência parcial. Padrão: 60.',
+    )
+    parser.add_argument(
+        '--resto',
+        type=float,
+        default=0.0,
+        help='Quanto do matiz do fundo tirar das bordas, de 0 a 1. Contra fundo '
+             'chapado colorido, 0.8 costuma varrer a franja. Padrão: 0.',
+    )
     args = parser.parse_args()
 
     imagem = Image.open(args.entrada).convert('RGB')
     pixels = np.asarray(imagem).astype(float)
 
     papel = args.papel if args.papel is not None else estimar_papel(pixels)
-    pigmento, cobertura = separar(pixels, papel, args.limpar, args.ganho)
+    pigmento, cobertura = separar(
+        pixels, papel, args.limpar, args.ganho,
+        args.modo, args.tolerancia, args.suavidade, args.resto,
+    )
 
     rgba = np.dstack([pigmento, cobertura * 255.0]).astype(np.uint8)
     if args.aparar:
@@ -130,7 +225,7 @@ def main() -> None:
     transparentes = int((cobertura == 0).sum())
     total = cobertura.size
     hexa = ''.join('%02x' % int(round(c)) for c in papel)
-    print('Papel usado: #' + hexa)
+    print(('Fundo usado: #' if args.modo == 'chapado' else 'Papel usado: #') + hexa)
     print(f'Gravado em: {saida}')
     print(
         f'Transparente: {transparentes / total:.0%} · '

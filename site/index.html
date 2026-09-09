@@ -14,10 +14,11 @@
   <header class="topo">
     <h1>Aquarela</h1>
     <p>
-      Tira o papel de uma aquarela e devolve um PNG com transparência real.
-      Não é recorte de fundo: a tinta translúcida é separada do papel por baixo,
-      então as aguadas claras sobrevivem. É a mesma conta que a
-      <code>aquarela.py</code> faz — conferida byte a byte —, aqui ao vivo.
+      Tira o fundo de uma ilustração e devolve um PNG com transparência real.
+      Sobre papel claro não é recorte: a tinta translúcida é separada do papel
+      por baixo, então as aguadas sobrevivem. Sobre uma cor chapada a conta muda
+      para distância de cor, e aí um desenho claro não some. É a mesma conta que
+      a <code>aquarela.py</code> faz — conferida byte a byte —, aqui ao vivo.
       <strong>Nada sai do seu navegador.</strong>
     </p>
   </header>
@@ -63,10 +64,10 @@
             <i class="t" id="bT"></i><i class="a" id="bA"></i><i class="o" id="bO"></i>
           </div>
           <dl class="numeros">
-            <div><dt>Transparente</dt><dd id="nT">—</dd></div>
+            <div><dt>Fundo</dt><dd id="nT">—</dd></div>
             <div><dt>Aguada</dt><dd id="nA">—</dd></div>
             <div><dt>Tinta cheia</dt><dd id="nO">—</dd></div>
-            <div><dt>Papel medido</dt><dd id="nPapel">—</dd></div>
+            <div><dt>Fundo medido</dt><dd id="nPapel">—</dd></div>
             <div><dt>Entrada</dt><dd id="nEntrada">—</dd></div>
             <div><dt>Saída</dt><dd id="nSaida">—</dd></div>
             <div><dt>Arquivo</dt><dd id="nPeso">—</dd></div>
@@ -81,6 +82,20 @@
         <h2>Separação</h2>
 
         <div class="campo">
+          <label for="modo">O que há atrás do desenho</label>
+          <select id="modo">
+            <option value="aquarela">Papel claro — tinta translúcida por cima</option>
+            <option value="chapado">Uma cor chapada — verde, azul, o que for</option>
+          </select>
+          <p class="campo__dica" id="dicaModo">
+            No papel, a tinta só escurece o que está por baixo, e é o escurecimento
+            que mede a cobertura. Num fundo de cor chapada isso não vale: um desenho
+            claro é mais claro que o fundo e sumiria inteiro. Ali a conta muda para
+            distância de cor.
+          </p>
+        </div>
+
+        <div class="campo" data-modo="aquarela">
           <div class="campo__topo">
             <label for="ganho">Ganho</label>
             <output id="vGanho">1.00</output>
@@ -89,7 +104,7 @@
           <p class="campo__dica">Multiplica a cobertura. Acima de 1 a tinta fica mais densa e menos papel escapa; abaixo, mais transparente.</p>
         </div>
 
-        <div class="campo">
+        <div class="campo" data-modo="aquarela">
           <div class="campo__topo">
             <label for="limpar">Limpar</label>
             <output id="vLimpar">0.020</output>
@@ -98,9 +113,36 @@
           <p class="campo__dica">Abaixo desta cobertura o pixel vira transparente puro. Sobe para varrer o ruído de compressão; sobe demais e come a aguada.</p>
         </div>
 
+        <div class="campo" data-modo="chapado" hidden>
+          <div class="campo__topo">
+            <label for="tolerancia">Tolerância</label>
+            <output id="vTolerancia">20</output>
+          </div>
+          <input id="tolerancia" type="range" min="0" max="120" step="1" value="20">
+          <p class="campo__dica">Distância de cor abaixo da qual o pixel é fundo puro. Sobe se sobrar sujeira do fundo; desce se o desenho começar a ser comido.</p>
+        </div>
+
+        <div class="campo" data-modo="chapado" hidden>
+          <div class="campo__topo">
+            <label for="suavidade">Suavidade</label>
+            <output id="vSuavidade">40</output>
+          </div>
+          <input id="suavidade" type="range" min="1" max="180" step="1" value="40">
+          <p class="campo__dica">Largura da rampa acima da tolerância, onde a borda ganha transparência parcial. Baixa demais recorta em serra; alta demais deixa halo.</p>
+        </div>
+
+        <div class="campo" data-modo="chapado" hidden>
+          <div class="campo__topo">
+            <label for="resto">Tirar franja</label>
+            <output id="vResto">0%</output>
+          </div>
+          <input id="resto" type="range" min="0" max="100" step="1" value="0">
+          <p class="campo__dica">Remove das bordas o matiz que sobrou do fundo. Age só onde a cobertura é parcial — no miolo opaco não há fundo por baixo, e mexer ali estragaria cores que legitimamente puxam para a do fundo.</p>
+        </div>
+
         <div class="campo">
           <div class="campo__topo">
-            <label for="papelHex">Papel</label>
+            <label for="papelHex" id="rotuloPapel">Papel</label>
             <output id="vPapel">medido nas bordas</output>
           </div>
           <div class="linha">
@@ -109,7 +151,7 @@
             <button type="button" class="discreto" id="btPapelAuto" aria-pressed="true">Auto</button>
             <button type="button" class="discreto" id="btConta" aria-pressed="false">Conta-gotas</button>
           </div>
-          <p class="campo__dica">Por padrão é a mediana das bordas. Se a varredura tem moldura ou sombra, escolha um ponto de papel limpo com o conta-gotas.</p>
+          <p class="campo__dica">Por padrão é a mediana das bordas. Se a varredura tem moldura ou sombra — ou se o fundo chapado não encosta na borda —, escolha um ponto limpo com o conta-gotas.</p>
         </div>
       </div>
 

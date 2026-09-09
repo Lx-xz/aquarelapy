@@ -416,6 +416,10 @@ button.discreto[aria-pressed="true"] {
 
 .oculto { display: none !important; }
 
+/* O `hidden` do HTML perde para qualquer regra de display do autor — e a
+   `.campo` declara `display: grid`. Sem isto, esconder um campo não esconde. */
+[hidden] { display: none !important; }
+
 .rodape {
   margin-top: var(--e7);
   padding-top: var(--e4);

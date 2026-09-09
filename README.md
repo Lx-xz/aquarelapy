@@ -1,20 +1,39 @@
 # Aquarela
 
-Tira o papel de uma aquarela e devolve um PNG com transparência real.
+Tira o fundo de uma ilustração e devolve um PNG com transparência real.
 
-Não é recorte de fundo. Uma aquarela é pigmento translúcido **sobre** papel: o
-que se vê em cada ponto é uma mistura entre a tinta e o papel por baixo.
-Recortar por semelhança de cor destrói as aguadas claras, que são quase papel.
-
-O que se faz aqui é desfazer a mistura. Assumindo
+Em ambos os modos o pigmento é recuperado do mesmo modelo:
 
 ```
-observado = pigmento · cobertura + papel · (1 - cobertura)
+observado = pigmento · cobertura + fundo · (1 - cobertura)
 ```
 
-estima-se a cobertura pelo canal que mais escureceu em relação ao papel e
-recupera-se o pigmento. O resultado, sobreposto a qualquer fundo, se comporta
-como a tinta se comportaria sobre aquele fundo.
+O que muda entre os dois é como se estima a **cobertura**.
+
+## Dois modos, porque são dois problemas
+
+**`aquarela` (padrão) — papel claro por baixo da tinta.**
+Uma aquarela é pigmento translúcido *sobre* papel: o que se vê é uma mistura
+entre a tinta e o papel. Recortar por semelhança de cor destruiria as aguadas
+claras, que são quase papel. A tinta só escurece, então a cobertura sai do canal
+que mais escureceu, em proporção à folga que havia até o preto.
+
+**`chapado` — uma cor chapada atrás do desenho.**
+Aqui o fundo não está por baixo da tinta, está atrás dela, e o desenho costuma
+ser opaco. O escurecimento deixa de servir: **um desenho claro é mais claro que
+o fundo, e o modo `aquarela` o apagaria inteiro** — foi o que motivou este modo,
+com uma criatura branca sobre verde. A cobertura passa a sair da *distância de
+cor* até o fundo, que é o que separa um cinza neutro de um verde de brilho
+parecido.
+
+Duas armadilhas que valem saber, porque são visíveis:
+
+- Medir por canal, em vez de por distância, faz um cinza neutro sobre verde
+  parecer 40% tinta. Ao descontar 60% de verde, ele volta magenta. É a razão de
+  o modo `chapado` não ser só um ajuste do outro.
+- Nas bordas sobra matiz do fundo — a franja verde. `--resto` a remove, mas só
+  onde a cobertura é parcial: no miolo opaco não há fundo por baixo, e um ocre,
+  que legitimamente contém verde, sairia rosa se fosse tratado como franja.
 
 ## Duas maneiras de usar
 
@@ -28,14 +47,19 @@ navegador — não há upload.
 pip install -r requirements.txt
 python3 aquarela.py capa.jpg --aparar
 python3 aquarela.py capa.jpg --saida hero.png --papel '#fcf9ed' --ganho 1.3
+python3 aquarela.py grifo.jpg --modo chapado --tolerancia 20 --suavidade 40 --aparar
 ```
 
-| opção | o que faz |
-|---|---|
-| `--papel` | Cor do papel. Sem ela, é a mediana das bordas da imagem. |
-| `--ganho` | Multiplica a cobertura. Acima de 1, tinta mais densa. |
-| `--limpar` | Abaixo desta cobertura o pixel vira transparente puro. |
-| `--aparar` | Corta as margens totalmente transparentes. |
+| opção | modo | o que faz |
+|---|---|---|
+| `--papel` | ambos | Cor do papel ou do fundo. Sem ela, é a mediana das bordas. |
+| `--aparar` | ambos | Corta as margens totalmente transparentes. |
+| `--ganho` | aquarela | Multiplica a cobertura. Acima de 1, tinta mais densa. |
+| `--limpar` | aquarela | Abaixo desta cobertura o pixel vira transparente puro. |
+| `--modo` | — | `aquarela` (padrão) ou `chapado`. |
+| `--tolerancia` | chapado | Distância de cor abaixo da qual o pixel é fundo puro. |
+| `--suavidade` | chapado | Largura da rampa onde a borda ganha alfa parcial. |
+| `--resto` | chapado | Quanto do matiz do fundo tirar das bordas, de 0 a 1. |
 
 ## As duas fazem a mesma conta
 
@@ -45,7 +69,8 @@ há um teste que passa a mesma imagem pelas duas implementações e compara os
 bytes RGBA um a um:
 
 ```bash
-python3 teste/paridade.py caminho/da/imagem.png --ganho 1.6 --limpar 0.08
+python3 teste/paridade.py imagem.png --ganho 1.6 --limpar 0.08
+python3 teste/paridade.py grifo.jpg --modo chapado --tolerancia 20 --resto 1.0
 ```
 
 ```
@@ -70,12 +95,23 @@ O teste precisa do `node` no caminho.
 - **Largura de saída** e **WebP**, que com transparência costuma sair em torno
   de metade do PNG.
 
-## O limite
+## Os limites
 
-Aquarela sobre fundo escuro fica opaca, porque tinta translúcida precisa de
-papel claro por baixo. Isso não é defeito da ferramenta, é como a tinta funciona
-— e por isso a prévia oferece o passe-partout: uma folha de papel atrás da
+**Aquarela sobre fundo escuro fica opaca**, porque tinta translúcida precisa de
+papel claro por baixo. Não é defeito da ferramenta, é como a tinta funciona — e
+por isso a prévia oferece o passe-partout: uma folha de papel atrás da
 ilustração, como uma estampa colada na página.
+
+**Uma aguada genuinamente translúcida sobre cor chapada não tem volta exata.**
+Medindo contra uma separação de alfa conhecido, recomposta sobre quatro fundos e
+separada de novo, o erro médio de cor ficou entre 26 e 57 de 255, e o de alfa
+entre 80 e 110. É o esperado: uma equação, duas incógnitas por pixel. O modo
+`chapado` funciona bem para desenho opaco sobre fundo chapado, que é o caso
+comum; para aguada de verdade, o caminho é gerar sobre papel claro.
+
+Nessa mesma medição o **verde saiu o melhor dos quatro fundos** testados para um
+desenho de tons quentes — melhor que azul, magenta e ciano. Contraria a
+intuição, mas foi medido.
 
 ## Estrutura
 

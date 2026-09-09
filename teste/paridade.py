@@ -30,6 +30,10 @@ def main() -> int:
     p.add_argument('imagem', type=Path)
     p.add_argument('--limpar', type=float, default=0.02)
     p.add_argument('--ganho', type=float, default=1.0)
+    p.add_argument('--modo', choices=('aquarela', 'chapado'), default='aquarela')
+    p.add_argument('--tolerancia', type=float, default=30.0)
+    p.add_argument('--suavidade', type=float, default=60.0)
+    p.add_argument('--resto', type=float, default=0.0)
     args = p.parse_args()
 
     imagem = Image.open(args.imagem).convert('RGB')
@@ -37,7 +41,10 @@ def main() -> int:
     altura, largura = pixels.shape[:2]
 
     papel = estimar_papel(pixels)
-    pigmento, cobertura = separar(pixels, papel, args.limpar, args.ganho)
+    pigmento, cobertura = separar(
+        pixels, papel, args.limpar, args.ganho,
+        args.modo, args.tolerancia, args.suavidade, args.resto,
+    )
     py = np.dstack([pigmento, cobertura * 255.0]).astype(np.uint8)
 
     with tempfile.TemporaryDirectory() as tmp:
@@ -49,9 +56,14 @@ def main() -> int:
         ])
         entrada.write_bytes(rgba_entrada.astype(np.uint8).tobytes())
 
+        opcoes = json.dumps({
+            'limpar': args.limpar, 'ganho': args.ganho, 'modo': args.modo,
+            'tolerancia': args.tolerancia, 'suavidade': args.suavidade,
+            'resto': args.resto, 'papel': [float(c) for c in papel],
+        })
         r = subprocess.run(
             ['node', str(RAIZ / 'teste' / 'nucleo.mjs'), str(entrada),
-             str(largura), str(altura), str(args.limpar), str(args.ganho), str(saida)],
+             str(largura), str(altura), str(saida), opcoes],
             capture_output=True, text=True, check=False,
         )
         if r.returncode != 0:
