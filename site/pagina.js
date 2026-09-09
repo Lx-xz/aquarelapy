@@ -95,6 +95,8 @@ function desenharAntes() {
     tela.height = A;
   }
   elementos.telaAntes.getContext('2d').putImageData(estado.previa, 0, 0);
+  // A proporção deixa o CSS limitar o palco pela altura em telas estreitas.
+  elementos.palco.style.setProperty('--proporcao', String(L / A));
 }
 
 /* --- O cálculo ----------------------------------------------------------- */

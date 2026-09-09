@@ -126,12 +126,21 @@ h1, h2, h3 { margin: 0; font-weight: 600; line-height: 1.2; }
 .oficina {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 21rem;
-  gap: var(--e6);
+  gap: var(--e5) var(--e6);
   align-items: start;
 }
 
+/* O palco e a section ocupam a coluna da esquerda; o painel, a da direita,
+   atravessando as duas linhas. O palco precisa ser irmão do painel, e não neto:
+   `position: sticky` gruda dentro do pai, e um pai que termina antes dos
+   controles solta o palco justamente quando ele faria falta. */
+.palco-fixo, .oficina > section { grid-column: 1; }
+.oficina > .painel { grid-column: 2; grid-row: 1 / span 2; }
+
 @media (max-width: 68rem) {
-  .oficina { grid-template-columns: minmax(0, 1fr); }
+  .oficina { display: block; }
+  .oficina > section { margin-top: var(--e4); }
+  .oficina > .painel { margin-top: var(--e5); }
 }
 
 /* --- Palco: a comparação ------------------------------------------------ */
@@ -271,6 +280,28 @@ h1, h2, h3 { margin: 0; font-weight: 600; line-height: 1.2; }
 
 @media (max-width: 68rem) {
   .painel { position: static; max-height: none; }
+
+  /* Em uma coluna, os controles ficam abaixo do palco — e mexer num deles
+     empurrava justamente o que se queria olhar para fora da tela. O palco passa
+     a ficar preso no topo, para o resultado nunca sair de vista enquanto se
+     arrasta um controle. */
+  .palco-fixo {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    margin-inline: calc(var(--e5) * -1);
+    padding: var(--e2) var(--e5);
+    background: var(--papel);
+    border-bottom: 1px solid var(--linha);
+  }
+
+  /* A altura é o que é escasso aqui. Limitar pela proporção da imagem encolhe
+     as duas telas juntas, sem desalinhar a cortina — o que um max-height na
+     tela faria. */
+  .palco {
+    max-width: calc(42dvh * var(--proporcao, 1.5));
+    margin-inline: auto;
+  }
 }
 
 .grupo { display: grid; gap: var(--e3); }
