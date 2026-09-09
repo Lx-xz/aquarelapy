@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aquarela — tirar o papel</title>
+<meta name="description" content="Tira o papel de uma aquarela e devolve um PNG com transparência real. Tudo acontece no seu navegador; nenhuma imagem é enviada.">
+<link rel="stylesheet" href="estilo.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='13' font-size='13'>🎨</text></svg>">
+</head>
+<body>
+<main class="pagina">
+
+  <header class="topo">
+    <h1>Aquarela</h1>
+    <p>
+      Tira o papel de uma aquarela e devolve um PNG com transparência real.
+      Não é recorte de fundo: a tinta translúcida é separada do papel por baixo,
+      então as aguadas claras sobrevivem. É a mesma conta que a
+      <code>aquarela.py</code> faz — conferida byte a byte —, aqui ao vivo.
+      <strong>Nada sai do seu navegador.</strong>
+    </p>
+  </header>
+
+  <div id="entrada" class="solta" tabindex="0" role="button"
+       aria-label="Escolher uma imagem">
+    <strong>Solte uma imagem aqui</strong>
+    <span>ou clique para escolher &middot; ou cole com Ctrl+V</span>
+    <input id="arquivo" type="file" accept="image/*" hidden>
+  </div>
+
+  <div id="oficina" class="oficina oculto">
+
+    <section>
+      <div id="palco" class="palco" data-fundo="xadrez">
+        <span class="palco__rotulo palco__rotulo--antes">Antes</span>
+        <span class="palco__rotulo palco__rotulo--depois">Depois</span>
+        <canvas id="telaAntes"></canvas>
+        <div class="palco__depois"><canvas id="telaDepois"></canvas></div>
+        <div id="marcaCorte" class="palco__corte oculto"></div>
+        <div id="alca" class="palco__alca" role="separator"
+             aria-label="Cortina entre antes e depois" tabindex="0"
+             aria-valuemin="0" aria-valuemax="100" aria-valuenow="50"></div>
+      </div>
+
+      <div class="fundos" role="group" aria-label="Fundo da prévia">
+        <button type="button" data-fundo="xadrez" aria-pressed="true">Xadrez</button>
+        <button type="button" data-fundo="claro" aria-pressed="false">Papel claro</button>
+        <button type="button" data-fundo="escuro" aria-pressed="false">Fundo escuro</button>
+        <button type="button" data-fundo="passe" aria-pressed="false">Passe-partout</button>
+      </div>
+
+      <p id="avisoAlfa" class="aviso oculto" style="margin-top:1rem">
+        Esta imagem já tem canal alfa — provavelmente já passou pela ferramenta.
+        Passar de novo não faz sentido: o papel que sobrou é o fundo transparente,
+        e o resultado sai vazio.
+      </p>
+
+      <div class="painel" style="margin-top:1rem;position:static;max-height:none">
+        <div class="grupo">
+          <h2>Resultado</h2>
+          <div class="barra" aria-hidden="true">
+            <i class="t" id="bT"></i><i class="a" id="bA"></i><i class="o" id="bO"></i>
+          </div>
+          <dl class="numeros">
+            <div><dt>Transparente</dt><dd id="nT">—</dd></div>
+            <div><dt>Aguada</dt><dd id="nA">—</dd></div>
+            <div><dt>Tinta cheia</dt><dd id="nO">—</dd></div>
+            <div><dt>Papel medido</dt><dd id="nPapel">—</dd></div>
+            <div><dt>Entrada</dt><dd id="nEntrada">—</dd></div>
+            <div><dt>Saída</dt><dd id="nSaida">—</dd></div>
+            <div><dt>Arquivo</dt><dd id="nPeso">—</dd></div>
+          </dl>
+        </div>
+      </div>
+    </section>
+
+    <aside class="painel">
+
+      <div class="grupo">
+        <h2>Separação</h2>
+
+        <div class="campo">
+          <div class="campo__topo">
+            <label for="ganho">Ganho</label>
+            <output id="vGanho">1.00</output>
+          </div>
+          <input id="ganho" type="range" min="0.2" max="2.5" step="0.01" value="1">
+          <p class="campo__dica">Multiplica a cobertura. Acima de 1 a tinta fica mais densa e menos papel escapa; abaixo, mais transparente.</p>
+        </div>
+
+        <div class="campo">
+          <div class="campo__topo">
+            <label for="limpar">Limpar</label>
+            <output id="vLimpar">0.020</output>
+          </div>
+          <input id="limpar" type="range" min="0" max="0.25" step="0.005" value="0.02">
+          <p class="campo__dica">Abaixo desta cobertura o pixel vira transparente puro. Sobe para varrer o ruído de compressão; sobe demais e come a aguada.</p>
+        </div>
+
+        <div class="campo">
+          <div class="campo__topo">
+            <label for="papelHex">Papel</label>
+            <output id="vPapel">medido nas bordas</output>
+          </div>
+          <div class="linha">
+            <span id="papelMostra" class="papel-mostra"></span>
+            <input id="papelHex" type="color" style="width:3rem;padding:0;height:1.9rem" disabled>
+            <button type="button" class="discreto" id="btPapelAuto" aria-pressed="true">Auto</button>
+            <button type="button" class="discreto" id="btConta" aria-pressed="false">Conta-gotas</button>
+          </div>
+          <p class="campo__dica">Por padrão é a mediana das bordas. Se a varredura tem moldura ou sombra, escolha um ponto de papel limpo com o conta-gotas.</p>
+        </div>
+      </div>
+
+      <div class="grupo">
+        <h2>Cor</h2>
+        <div class="campo">
+          <div class="campo__topo">
+            <label for="saturacao">Saturação</label>
+            <output id="vSaturacao">100%</output>
+          </div>
+          <input id="saturacao" type="range" min="0" max="200" step="1" value="100">
+          <p class="campo__dica">Separar o pigmento do papel costuma deixar a tinta um pouco mais pálida do que parecia. Aqui se devolve o que faltou.</p>
+        </div>
+      </div>
+
+      <div class="grupo">
+        <h2>Corte</h2>
+        <label class="caixa">
+          <input id="aparar" type="checkbox" checked>
+          Aparar as margens transparentes
+        </label>
+        <div class="campo">
+          <div class="campo__topo">
+            <label for="limiarCorte">Limiar do corte</label>
+            <output id="vLimiarCorte">0</output>
+          </div>
+          <input id="limiarCorte" type="range" min="0" max="40" step="1" value="0">
+          <p class="campo__dica">Alfa a partir do qual o pixel conta como desenho. Zero corta só o papel puro; subir descarta a poeira de aguada solta e aperta o corte.</p>
+        </div>
+        <div class="campo">
+          <div class="campo__topo">
+            <label for="margemCorte">Folga</label>
+            <output id="vMargemCorte">0 px</output>
+          </div>
+          <input id="margemCorte" type="range" min="0" max="120" step="1" value="0">
+        </div>
+        <p class="campo__dica">O tracejado no palco mostra o que sobra. O corte é aplicado na hora de gravar.</p>
+      </div>
+
+      <div class="grupo">
+        <h2>Saída</h2>
+        <div class="campo">
+          <div class="campo__topo">
+            <label for="largura">Largura</label>
+            <output id="vLargura">—</output>
+          </div>
+          <div class="linha">
+            <input id="largura" type="number" min="16" step="1">
+            <button type="button" class="discreto" id="btLarguraCheia">Cheia</button>
+          </div>
+        </div>
+        <div class="campo">
+          <label for="formato">Formato</label>
+          <select id="formato">
+            <option value="image/webp">WebP — bem menor, com transparência</option>
+            <option value="image/png">PNG — sem perdas</option>
+          </select>
+        </div>
+        <div class="campo" id="campoQualidade">
+          <div class="campo__topo">
+            <label for="qualidade">Qualidade</label>
+            <output id="vQualidade">92</output>
+          </div>
+          <input id="qualidade" type="range" min="60" max="100" step="1" value="92">
+        </div>
+        <div class="campo">
+          <label for="nome">Nome do arquivo</label>
+          <input id="nome" type="text" value="hero"
+                 style="width:100%;padding:0.3rem 0.5rem;border:1px solid var(--linha);border-radius:3px;background:var(--papel);color:var(--tinta);font:inherit;font-size:0.88rem">
+        </div>
+        <button type="button" class="acao" id="btGravar">Gravar</button>
+        <button type="button" class="discreto" id="btOutra">Trocar de imagem</button>
+      </div>
+
+    </aside>
+  </div>
+
+  <footer class="rodape">
+    A conta e os parâmetros são os mesmos da <code>aquarela.py</code> deste
+    repositório, verificados pixel a pixel por <code>teste/paridade.py</code>.
+    Aquarela sobre fundo escuro fica opaca — tinta translúcida precisa de papel
+    claro por baixo —, por isso a prévia oferece o passe-partout.
+  </footer>
+
+</main>
+<script type="module" src="pagina.js"></script>
+</body>
+</html>

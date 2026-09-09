@@ -1,0 +1,427 @@
+/* Aquarela — página única. Papel e tinta, como o compêndio que ela serve. */
+
+:root {
+  color-scheme: light;
+
+  --papel: #fdfaf5;
+  --papel-2: #f6f1e6;
+  --papel-3: #efe7d9;
+  --tinta: #2b2621;
+  --tinta-2: #554b40;
+  --tinta-3: #766a5b;
+  --linha: rgba(43, 38, 33, 0.2);
+  --linha-forte: rgba(43, 38, 33, 0.4);
+  --acento: #8a5450;
+  --acento-tinta: #683832;
+
+  --escuro: #1c1917;
+
+  --fonte: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --fonte-serif: Georgia, "Times New Roman", serif;
+  --fonte-num: ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --raio: 5px;
+  --e1: 0.25rem; --e2: 0.5rem; --e3: 0.75rem; --e4: 1rem;
+  --e5: 1.5rem; --e6: 2rem; --e7: 3rem;
+
+  --scroll: rgba(43, 38, 33, 0.3);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-tema="claro"]) {
+    color-scheme: dark;
+    --papel: #1c1917;
+    --papel-2: #211d1b;
+    --papel-3: #2a2522;
+    --tinta: #f0e7da;
+    --tinta-2: #dbd0c1;
+    --tinta-3: #ab9f8e;
+    --linha: rgba(240, 231, 218, 0.16);
+    --linha-forte: rgba(240, 231, 218, 0.34);
+    --acento: #cfa6a0;
+    --acento-tinta: #e6bdb6;
+    --scroll: rgba(240, 231, 218, 0.26);
+  }
+}
+
+* { box-sizing: border-box; }
+
+html {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scroll) transparent;
+  scrollbar-gutter: stable;
+}
+::-webkit-scrollbar { width: 11px; height: 11px; }
+::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background-color: var(--scroll);
+  background-clip: padding-box;
+  border: 3px solid transparent;
+  border-radius: 999px;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  background: var(--papel);
+  color: var(--tinta);
+  font-family: var(--fonte);
+  font-size: 15px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3 { margin: 0; font-weight: 600; line-height: 1.2; }
+
+.pagina {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: var(--e6) var(--e5) var(--e7);
+}
+
+/* --- Cabeçalho ---------------------------------------------------------- */
+
+.topo { margin-bottom: var(--e6); }
+
+.topo h1 {
+  font-family: var(--fonte-serif);
+  font-size: clamp(1.8rem, 1.4rem + 1.6vw, 2.6rem);
+  font-weight: 400;
+  letter-spacing: -0.02em;
+}
+
+.topo p {
+  margin: var(--e2) 0 0;
+  max-width: 62ch;
+  color: var(--tinta-2);
+}
+
+.topo code { font-family: var(--fonte-num); font-size: 0.9em; }
+
+/* --- Zona de entrada ---------------------------------------------------- */
+
+.solta {
+  display: grid;
+  place-items: center;
+  gap: var(--e3);
+  padding: var(--e7) var(--e5);
+  border: 1px dashed var(--linha-forte);
+  border-radius: var(--raio);
+  background: var(--papel-2);
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.2s, background-color 0.2s;
+}
+
+.solta:hover, .solta[data-sobre="sim"] {
+  border-color: var(--acento);
+  background: var(--papel-3);
+}
+
+.solta strong { font-size: 1.05rem; }
+.solta span { color: var(--tinta-3); font-size: 0.9rem; }
+
+/* --- Oficina ------------------------------------------------------------ */
+
+.oficina {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 21rem;
+  gap: var(--e6);
+  align-items: start;
+}
+
+@media (max-width: 68rem) {
+  .oficina { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* --- Palco: a comparação ------------------------------------------------ */
+
+.palco {
+  position: relative;
+  border: 1px solid var(--linha);
+  border-radius: var(--raio);
+  overflow: hidden;
+  touch-action: none;
+  user-select: none;
+}
+
+.palco[data-fundo="xadrez"] {
+  --q: #e4ded2;
+  background-color: #f7f3ea;
+  background-image:
+    linear-gradient(45deg, var(--q) 25%, transparent 25%),
+    linear-gradient(-45deg, var(--q) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--q) 75%),
+    linear-gradient(-45deg, transparent 75%, var(--q) 75%);
+  background-size: 18px 18px;
+  background-position: 0 0, 0 9px, 9px -9px, -9px 0;
+}
+.palco[data-fundo="claro"] { background: #fdfaf5; }
+.palco[data-fundo="escuro"] { background: #1c1917; }
+.palco[data-fundo="passe"] { background: #f6f1e6; }
+
+.palco canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* A cortina corta as duas telas, não só a de cima. Se o antes continuasse
+   inteiro por baixo, a transparência do depois revelaria a imagem original em
+   vez do fundo — e a comparação não mostraria nada. */
+#telaAntes {
+  clip-path: inset(0 calc(100% - var(--corte, 50%)) 0 0);
+}
+
+.palco__depois {
+  position: absolute;
+  inset: 0;
+  clip-path: inset(0 0 0 var(--corte, 50%));
+}
+
+.palco__corte {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border: 1px dashed var(--acento);
+  opacity: 0.9;
+}
+
+.palco__alca {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--corte, 50%);
+  width: 2px;
+  margin-left: -1px;
+  background: var(--acento);
+  cursor: ew-resize;
+}
+
+.palco__alca::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 2.2rem;
+  height: 2.2rem;
+  transform: translate(-50%, -50%);
+  border: 2px solid var(--acento);
+  border-radius: 50%;
+  background: var(--papel);
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.25);
+}
+
+.palco__rotulo {
+  position: absolute;
+  top: var(--e3);
+  z-index: 2;
+  padding: 0.15rem var(--e2);
+  border-radius: 3px;
+  background: rgba(28, 25, 23, 0.72);
+  color: #fdfaf5;
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+.palco__rotulo--antes { left: var(--e3); }
+.palco__rotulo--depois { right: var(--e3); }
+
+/* --- Barra de fundos ---------------------------------------------------- */
+
+.fundos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--e2);
+  margin-top: var(--e3);
+}
+
+.fundos button {
+  padding: 0.3rem var(--e3);
+  border: 1px solid var(--linha);
+  border-radius: 999px;
+  background: none;
+  color: var(--tinta-2);
+  font: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.fundos button[aria-pressed="true"] {
+  border-color: var(--acento);
+  color: var(--acento-tinta);
+  background: var(--papel-2);
+}
+
+/* --- Painel de controles ------------------------------------------------ */
+
+.painel {
+  display: grid;
+  gap: var(--e5);
+  padding: var(--e5);
+  border: 1px solid var(--linha);
+  border-radius: var(--raio);
+  background: var(--papel-2);
+  position: sticky;
+  top: var(--e4);
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
+}
+
+@media (max-width: 68rem) {
+  .painel { position: static; max-height: none; }
+}
+
+.grupo { display: grid; gap: var(--e3); }
+
+.grupo > h2 {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--tinta-3);
+  padding-bottom: var(--e2);
+  border-bottom: 1px solid var(--linha);
+}
+
+.campo { display: grid; gap: var(--e1); }
+
+.campo__topo {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--e2);
+}
+
+.campo label { font-size: 0.88rem; }
+
+.campo output {
+  font-family: var(--fonte-num);
+  font-size: 0.8rem;
+  color: var(--tinta-3);
+}
+
+.campo__dica {
+  font-size: 0.76rem;
+  line-height: 1.45;
+  color: var(--tinta-3);
+}
+
+input[type="range"] {
+  width: 100%;
+  accent-color: var(--acento);
+}
+
+input[type="number"], select {
+  width: 100%;
+  padding: 0.3rem var(--e2);
+  border: 1px solid var(--linha);
+  border-radius: 3px;
+  background: var(--papel);
+  color: var(--tinta);
+  font: inherit;
+  font-size: 0.88rem;
+}
+
+.linha { display: flex; align-items: center; gap: var(--e2); }
+.linha > * { min-width: 0; }
+
+.caixa { display: flex; align-items: center; gap: var(--e2); font-size: 0.88rem; }
+.caixa input { accent-color: var(--acento); }
+
+.papel-mostra {
+  width: 1.6rem;
+  height: 1.6rem;
+  flex: 0 0 auto;
+  border: 1px solid var(--linha-forte);
+  border-radius: 3px;
+}
+
+button.acao {
+  padding: var(--e2) var(--e4);
+  border: 1px solid var(--acento);
+  border-radius: var(--raio);
+  background: var(--acento);
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+button.acao:hover { background: var(--acento-tinta); border-color: var(--acento-tinta); }
+button.acao:disabled { opacity: 0.5; cursor: default; }
+
+button.discreto {
+  padding: 0.28rem var(--e3);
+  border: 1px solid var(--linha);
+  border-radius: 3px;
+  background: none;
+  color: var(--tinta-2);
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+button.discreto:hover { border-color: var(--linha-forte); }
+button.discreto[aria-pressed="true"] {
+  border-color: var(--acento);
+  color: var(--acento-tinta);
+}
+
+/* --- Números ------------------------------------------------------------ */
+
+.numeros {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(6.5rem, 1fr));
+  gap: var(--e3) var(--e4);
+  font-size: 0.82rem;
+}
+
+.numeros div { display: grid; gap: 0.1rem; }
+
+.numeros dt {
+  color: var(--tinta-3);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.numeros dd {
+  margin: 0;
+  font-family: var(--fonte-num);
+  color: var(--tinta);
+}
+
+.barra {
+  display: flex;
+  height: 6px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--papel-3);
+}
+.barra i { height: 100%; }
+.barra .t { background: var(--linha); }
+.barra .a { background: #9ab89f; }
+.barra .o { background: var(--acento); }
+
+/* --- Avisos ------------------------------------------------------------- */
+
+.aviso {
+  padding: var(--e3) var(--e4);
+  border-left: 2px solid var(--acento);
+  background: var(--papel-3);
+  border-radius: 0 3px 3px 0;
+  font-size: 0.84rem;
+  color: var(--tinta-2);
+}
+
+.oculto { display: none !important; }
+
+.rodape {
+  margin-top: var(--e7);
+  padding-top: var(--e4);
+  border-top: 1px solid var(--linha);
+  font-size: 0.82rem;
+  color: var(--tinta-3);
+}
+
+.rodape a { color: inherit; }
