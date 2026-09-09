@@ -24,13 +24,14 @@ jobs:
       - name: Obter o código
         uses: actions/checkout@v4
 
+      # O Pages precisa estar ligado a mao uma vez, em
+      # Settings -> Pages -> Source: GitHub Actions.
+      # O parametro `enablement: true` desta acao promete criar o site sozinho,
+      # mas nao funciona: o GITHUB_TOKEN do workflow nao tem acesso a criacao
+      # ("Resource not accessible by integration"), por mais que se conceda
+      # `pages: write`. Nao adianta tentar de novo por aqui.
       - name: Preparar o Pages
         uses: actions/configure-pages@v5
-        with:
-          # O repositorio nunca teve Pages ligado, e sem isto a acao nao acha o
-          # site para configurar. Com enablement ela cria o site na primeira
-          # execucao e nao faz nada nas seguintes.
-          enablement: true
 
       # A página é estática e não depende de build: sobe a pasta como está.
       - name: Enviar a pasta do site
