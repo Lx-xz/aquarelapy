@@ -95,6 +95,37 @@ O teste precisa do `node` no caminho.
 - **Largura de saída** e **WebP**, que com transparência costuma sair em torno
   de metade do PNG.
 
+## Que fundo pedir ao gerador
+
+A intuição diz "criatura colorida sobre claro, criatura branca sobre escuro".
+Medindo, não é bem isso. `teste/fundos.py` pinta três criaturas sobre um alfa
+real, compõe cada uma sobre seis fundos, separa com o melhor modo e parâmetros
+de cada caso e compara com a verdade. O erro de alfa, que é o que vira fantasma
+e buraco no resultado (0 é perfeito, 255 é o pior possível):
+
+| criatura | branco | cinza | preto | verde | azul | magenta |
+|---|---|---|---|---|---|---|
+| colorida (ocre) | 6,7 | 8,1 | 12,0 | **3,8** | **2,1** | 7,8 |
+| esbranquiçada | **37,6** | 4,0 | 4,0 | 7,7 | 8,9 | 8,1 |
+| escura | 5,1 | 6,5 | **23,0** | 4,6 | 6,3 | 13,6 |
+
+O que decide não é claro contra escuro: é **distância às cores da própria
+criatura**. O branco arruína a criatura branca; o preto arruína a escura, e pelo
+mesmo motivo. Contra preto, `observado ≈ pigmento · cobertura` — o fundo não
+contribui com nada, e uma tinta clara com pouca cobertura fica idêntica a uma
+tinta escura com muita. A informação não existe.
+
+Lendo as colunas, um fundo de cor saturada serve para tudo: o **verde** é o mais
+constante dos seis (pior caso 7,7), com o azul logo atrás. Branco e preto são
+ótimos ou péssimos conforme a criatura.
+
+Uma ressalva que o número não mede: **papel claro é o único fundo que devolve
+aquarela de verdade**, translúcida, com os brancos sendo papel. Se a ilustração
+vai assentar numa página clara, isso pode valer mais que a precisão — o erro ali
+não parece erro, parece aquarela. O ensaio também é sintético e sem ruído; num
+JPEG real o fundo claro sofre menos com artefato de compressão do que estes
+números sugerem.
+
 ## Os limites
 
 **Aquarela sobre fundo escuro fica opaca**, porque tinta translúcida precisa de
