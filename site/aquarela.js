@@ -103,9 +103,126 @@ function preparar(papel, op) {
     tolerancia: op.tolerancia ?? 30,
     suavidade: op.suavidade ?? 60,
     resto: op.resto ?? 0,
+    conectado: op.conectado ?? 0,
+    banda: op.banda ?? 3,
+    maiorIlha: op.maiorIlha ?? 0,
     // Direção do matiz do fundo, para tirar a franja das bordas.
     dir: norma < 1e-6 ? null : dir.map((c) => c / norma),
   };
+}
+
+/**
+ * Marca o fundo que *encosta na borda* do quadro.
+ *
+ * Cor sozinha não distingue o fundo de uma parte do desenho que por acaso tem a
+ * cor dele — a sobrancelha escura de um grifo sobre preto é o exemplo. Quem
+ * distingue é a vizinhança: o fundo é uma região contínua que chega até a borda.
+ * Uma ilha da mesma cor, cercada de desenho, não é fundo.
+ *
+ * Inundação por vizinhança de quatro, com pilha em Int32Array — uma fila de
+ * objetos aqui custaria mais que toda a separação.
+ */
+export function fundoConectado(dados, largura, altura, papel, parecido) {
+  const [pr, pg, pb] = papel;
+  const total = largura * altura;
+  const marca = new Uint8Array(total);
+  const pilha = new Int32Array(total);
+  let topo = 0;
+
+  const candidato = (i) => {
+    const j = i * 4;
+    const dr = dados[j] - pr, dg = dados[j + 1] - pg, db = dados[j + 2] - pb;
+    return Math.sqrt(dr * dr + dg * dg + db * db) < parecido;
+  };
+  const semear = (i) => {
+    if (!marca[i] && candidato(i)) { marca[i] = 1; pilha[topo++] = i; }
+  };
+
+  for (let x = 0; x < largura; x += 1) {
+    semear(x);
+    semear((altura - 1) * largura + x);
+  }
+  for (let y = 0; y < altura; y += 1) {
+    semear(y * largura);
+    semear(y * largura + largura - 1);
+  }
+
+  while (topo > 0) {
+    const i = pilha[--topo];
+    const x = i % largura;
+    if (x > 0) semear(i - 1);
+    if (x < largura - 1) semear(i + 1);
+    if (i >= largura) semear(i - largura);
+    if (i + largura < total) semear(i + largura);
+  }
+  return marca;
+}
+
+/**
+ * Devolve ao fundo as ilhas grandes cercadas pelo desenho.
+ *
+ * A inundação não chega a um bolsão de fundo fechado pelo próprio desenho — o
+ * vão entre o corpo e a asa de um grifo. Ele ficaria opaco, como se fosse tinta.
+ * O que separa um bolsão de um detalhe é o tamanho: medido numa ilustração, as
+ * duas ilhas de fundo tinham 11.716 e 2.726 pixels, e as 1.273 ilhas de traço
+ * escuro tinham todas menos de 500.
+ */
+export function abrirBolsoes(dados, largura, altura, papel, parecido, marca, maiorIlha) {
+  if (maiorIlha <= 0) return marca;
+  const [pr, pg, pb] = papel;
+  const total = largura * altura;
+  const visto = new Uint8Array(total);
+  const grupo = new Int32Array(total);
+
+  const ehIlha = (i) => {
+    if (marca[i]) return false;
+    const j = i * 4;
+    const dr = dados[j] - pr, dg = dados[j + 1] - pg, db = dados[j + 2] - pb;
+    return Math.sqrt(dr * dr + dg * dg + db * db) < parecido;
+  };
+
+  for (let semente = 0; semente < total; semente += 1) {
+    if (visto[semente] || !ehIlha(semente)) continue;
+    let fim = 0;
+    grupo[fim++] = semente;
+    visto[semente] = 1;
+    for (let k = 0; k < fim; k += 1) {
+      const i = grupo[k];
+      const x = i % largura;
+      if (x > 0 && !visto[i - 1] && ehIlha(i - 1)) { visto[i - 1] = 1; grupo[fim++] = i - 1; }
+      if (x < largura - 1 && !visto[i + 1] && ehIlha(i + 1)) { visto[i + 1] = 1; grupo[fim++] = i + 1; }
+      if (i >= largura && !visto[i - largura] && ehIlha(i - largura)) {
+        visto[i - largura] = 1; grupo[fim++] = i - largura;
+      }
+      if (i + largura < total && !visto[i + largura] && ehIlha(i + largura)) {
+        visto[i + largura] = 1; grupo[fim++] = i + largura;
+      }
+    }
+    if (fim > maiorIlha) {
+      for (let k = 0; k < fim; k += 1) marca[grupo[k]] = 1;
+    }
+  }
+  return marca;
+}
+
+/** Engorda a máscara em `passos` pixels, por vizinhança de quatro. */
+export function dilatar(marca, largura, altura, passos) {
+  let atual = marca;
+  for (let p = 0; p < passos; p += 1) {
+    const proxima = atual.slice();
+    for (let y = 0; y < altura; y += 1) {
+      for (let x = 0; x < largura; x += 1) {
+        const i = y * largura + x;
+        if (atual[i]) continue;
+        if ((x > 0 && atual[i - 1]) || (x < largura - 1 && atual[i + 1])
+          || (y > 0 && atual[i - largura]) || (y < altura - 1 && atual[i + largura])) {
+          proxima[i] = 1;
+        }
+      }
+    }
+    atual = proxima;
+  }
+  return atual;
 }
 
 /**
@@ -117,6 +234,19 @@ export function separar(dados, largura, altura, opcoes) {
   const papel = opcoes.papel;
 
   const total = largura * altura;
+
+  // A inundação decide *o que* é fundo; a rampa decide só a maciez da borda.
+  // Com o miolo protegido, a rampa pode ser larga sem comer o desenho — era
+  // essa amarra que fazia o fundo preto apagar a sobrancelha.
+  let fora = null;
+  let dentro = null;
+  if (o.conectado > 0) {
+    fora = fundoConectado(dados, largura, altura, papel, o.conectado);
+    fora = abrirBolsoes(dados, largura, altura, papel, o.conectado, fora, o.maiorIlha);
+    const faixa = dilatar(fora, largura, altura, o.banda);
+    dentro = new Uint8Array(total);
+    for (let i = 0; i < total; i += 1) dentro[i] = !fora[i] && !faixa[i] ? 1 : 0;
+  }
   const rgba = new Uint8ClampedArray(total * 4);
   let transparentes = 0;
   let opacos = 0;
@@ -127,7 +257,8 @@ export function separar(dados, largura, altura, opcoes) {
     const g = dados[i + 1];
     const b = dados[i + 2];
 
-    const a = coberturaEm(r, g, b, o);
+    let a = coberturaEm(r, g, b, o);
+    if (fora) a = fora[p] ? 0 : dentro[p] ? 1 : a;
 
     if (a === 0) transparentes += 1;
     else if (a > 0.98) opacos += 1;
@@ -242,6 +373,16 @@ export function caixaNaOrigem(dados, largura, altura, opcoes) {
   const o = preparar(opcoes.papel, opcoes);
   const limiar = opcoes.limiar ?? 0;
 
+  let fora = null;
+  let dentro = null;
+  if (o.conectado > 0) {
+    fora = fundoConectado(dados, largura, altura, opcoes.papel, o.conectado);
+    fora = abrirBolsoes(dados, largura, altura, opcoes.papel, o.conectado, fora, o.maiorIlha);
+    const faixa = dilatar(fora, largura, altura, o.banda);
+    dentro = new Uint8Array(largura * altura);
+    for (let i = 0; i < largura * altura; i += 1) dentro[i] = !fora[i] && !faixa[i] ? 1 : 0;
+  }
+
   let cima = altura;
   let baixo = -1;
   let esquerda = largura;
@@ -249,8 +390,10 @@ export function caixaNaOrigem(dados, largura, altura, opcoes) {
 
   for (let y = 0; y < altura; y += 1) {
     for (let x = 0; x < largura; x += 1) {
-      const i = (y * largura + x) * 4;
-      const a = coberturaEm(dados[i], dados[i + 1], dados[i + 2], o);
+      const p = y * largura + x;
+      const i = p * 4;
+      let a = coberturaEm(dados[i], dados[i + 1], dados[i + 2], o);
+      if (fora) a = fora[p] ? 0 : dentro[p] ? 1 : a;
       // O limiar é comparado com o mesmo byte que seria gravado no alfa.
       if (Math.floor(a * 255) <= limiar) continue;
       if (y < cima) cima = y;

@@ -129,8 +129,43 @@
             <label for="suavidade">Suavidade</label>
             <output id="vSuavidade">40</output>
           </div>
-          <input id="suavidade" type="range" min="1" max="180" step="1" value="40">
-          <p class="campo__dica">Largura da rampa acima da tolerância, onde a borda ganha transparência parcial. Baixa demais recorta em serra; alta demais deixa halo.</p>
+          <input id="suavidade" type="range" min="1" max="400" step="1" value="40">
+          <p class="campo__dica">Largura da rampa acima da tolerância, onde a borda ganha transparência parcial. Baixa demais recorta em serra; alta demais come o desenho — a não ser com a inundação ligada abaixo, que protege o miolo e libera rampas largas.</p>
+        </div>
+
+        <div class="campo" data-modo="chapado" hidden>
+          <label class="caixa">
+            <input id="conectado" type="checkbox">
+            Só é fundo o que encosta na borda
+          </label>
+          <p class="campo__dica">Cor sozinha não distingue o fundo de um traço do desenho que por acaso tem a cor dele — a sobrancelha escura de um grifo sobre preto. Quem distingue é a vizinhança: o fundo é uma região contínua que chega até a borda do quadro; uma ilha cercada de desenho, não. Com o miolo assim protegido, a suavidade pode ser larga sem comer o traço.</p>
+        </div>
+
+        <div class="campo" data-modo="chapado" data-conectado hidden>
+          <div class="campo__topo">
+            <label for="parecido">Alcance da inundação</label>
+            <output id="vParecido">60</output>
+          </div>
+          <input id="parecido" type="range" min="5" max="160" step="1" value="60">
+          <p class="campo__dica">Distância de cor que ainda conta como fundo ao espalhar da borda. Alta demais e a inundação vaza para dentro do desenho por um ponto claro.</p>
+        </div>
+
+        <div class="campo" data-modo="chapado" data-conectado hidden>
+          <div class="campo__topo">
+            <label for="ilha">Abrir bolsões</label>
+            <output id="vIlha">desligado</output>
+          </div>
+          <input id="ilha" type="range" min="0" max="6000" step="100" value="0">
+          <p class="campo__dica">A inundação não alcança um bolsão de fundo fechado pelo próprio desenho — o vão entre o corpo e a asa —, e ele ficaria opaco. O que separa um bolsão de um detalhe é o tamanho: suba até o vão abrir, sem chegar aos traços finos.</p>
+        </div>
+
+        <div class="campo" data-modo="chapado" data-conectado hidden>
+          <div class="campo__topo">
+            <label for="banda">Faixa da borda</label>
+            <output id="vBanda">3 px</output>
+          </div>
+          <input id="banda" type="range" min="1" max="12" step="1" value="3">
+          <p class="campo__dica">Largura, em pixels, onde a borda ganha transparência parcial. Fora dela o desenho é opaco e o fundo é vazio.</p>
         </div>
 
         <div class="campo" data-modo="chapado" hidden>

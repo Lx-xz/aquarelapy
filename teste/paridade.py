@@ -34,6 +34,9 @@ def main() -> int:
     p.add_argument('--tolerancia', type=float, default=30.0)
     p.add_argument('--suavidade', type=float, default=60.0)
     p.add_argument('--resto', type=float, default=0.0)
+    p.add_argument('--conectado', type=float, default=0.0)
+    p.add_argument('--banda', type=int, default=3)
+    p.add_argument('--ilha', type=int, default=0)
     args = p.parse_args()
 
     imagem = Image.open(args.imagem).convert('RGB')
@@ -44,6 +47,7 @@ def main() -> int:
     pigmento, cobertura = separar(
         pixels, papel, args.limpar, args.ganho,
         args.modo, args.tolerancia, args.suavidade, args.resto,
+        args.conectado, args.banda, args.ilha,
     )
     py = np.dstack([pigmento, cobertura * 255.0]).astype(np.uint8)
 
@@ -59,7 +63,8 @@ def main() -> int:
         opcoes = json.dumps({
             'limpar': args.limpar, 'ganho': args.ganho, 'modo': args.modo,
             'tolerancia': args.tolerancia, 'suavidade': args.suavidade,
-            'resto': args.resto, 'papel': [float(c) for c in papel],
+            'resto': args.resto, 'conectado': args.conectado, 'banda': args.banda, 'maiorIlha': args.ilha,
+            'papel': [float(c) for c in papel],
         })
         r = subprocess.run(
             ['node', str(RAIZ / 'teste' / 'nucleo.mjs'), str(entrada),

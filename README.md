@@ -26,6 +26,35 @@ com uma criatura branca sobre verde. A cobertura passa a sair da *distância de
 cor* até o fundo, que é o que separa um cinza neutro de um verde de brilho
 parecido.
 
+### Cor não basta: o fundo é o que encosta na borda
+
+Cor sozinha não distingue o fundo de um traço do desenho que por acaso tem a cor
+dele. Contra preto, a sobrancelha escura de um grifo fica a distância 72 do
+fundo, vira cobertura parcial e some. Contra branco, some o branco dos olhos.
+
+Quem distingue é a vizinhança. Com `--conectado`, só é fundo a região contínua
+que **chega até a borda do quadro**; uma ilha da mesma cor, cercada de desenho,
+não é. A inundação passa a decidir *o que* é fundo, e a rampa decide só a maciez
+da borda — com o miolo protegido, a rampa pode ser larga sem comer o traço, o
+que antes era impossível.
+
+```bash
+python3 aquarela.py grifo.jpg --modo chapado --conectado 60 \
+        --tolerancia 5 --suavidade 220 --banda 4 --ilha 1200 --aparar
+```
+
+Duas coisas mudam junto e as duas importam:
+
+- **O pigmento sai da cobertura final, não da fotométrica.** Onde a cobertura é
+  forçada a 1, o pigmento é o próprio pixel — não há divisão para estourar. Sem
+  isso, os pixels que a fotometria dava como quase transparentes voltavam em
+  cores saturadas, e forçá-los a opacos espalhava pontos vermelhos pela cara.
+- **`--ilha` devolve ao fundo os bolsões fechados pelo desenho** — o vão entre o
+  corpo e a asa, que a inundação não alcança e que ficaria opaco. O que separa
+  um bolsão de um detalhe é o tamanho: medido nesta ilustração, as duas ilhas de
+  fundo tinham 11.716 e 2.726 pixels, e as 1.273 ilhas de traço escuro tinham
+  todas menos de 500.
+
 Duas armadilhas que valem saber, porque são visíveis:
 
 - Medir por canal, em vez de por distância, faz um cinza neutro sobre verde
@@ -66,6 +95,9 @@ python3 aquarela.py grifo.jpg --modo chapado --tolerancia 20 --suavidade 40 --ap
 | `--tolerancia` | chapado | Distância de cor abaixo da qual o pixel é fundo puro. |
 | `--suavidade` | chapado | Largura da rampa onde a borda ganha alfa parcial. |
 | `--resto` | chapado | Quanto do matiz do fundo tirar das bordas, de 0 a 1. |
+| `--conectado` | chapado | Só é fundo o que encosta na borda. O valor é a distância de cor que ainda conta como fundo ao espalhar. |
+| `--banda` | chapado | Largura, em pixels, da faixa de transição na borda. |
+| `--ilha` | chapado | Ilha de cor de fundo cercada pelo desenho, maior que isto, volta a ser fundo. |
 
 ## As duas fazem a mesma conta
 
@@ -149,7 +181,12 @@ Daí uma diferença prática que a tabela de erro não mostra: **o verde perdoa,
 preto é preciso mas sensível**. Com rampa larga demais (suavidade 100), o preto
 esvazia a sobrancelha e os traços escuros; com rampa apertada, acerta. O verde
 dá o mesmo resultado numa faixa larga de parâmetros — ao custo da franja, que o
-`--resto` agora resolve.
+`--resto` resolve.
+
+Com `--conectado`, porém, essa tabela deixa de mandar: a inundação decide o que
+é fundo pela vizinhança, e a cor do fundo volta a ser só uma questão de franja.
+Aí o preto passa a ser a escolha limpa, por não ter matiz nenhum para sobrar
+na borda.
 
 Uma ressalva que o número não mede: **papel claro é o único fundo que devolve
 aquarela de verdade**, translúcida, com os brancos sendo papel. Se a ilustração

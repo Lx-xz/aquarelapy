@@ -129,6 +129,112 @@ def tirar_resto_do_fundo(
     return np.clip(pigmento - direcao * excesso * forca, 0, 255)
 
 
+def fundo_conectado(
+    pixels: np.ndarray, fundo: np.ndarray, parecido: float,
+) -> np.ndarray:
+    """Marca o fundo que *encosta na borda* da imagem.
+
+    Cor sozinha não distingue o fundo de uma parte do desenho que por acaso tem
+    a cor dele — a sobrancelha escura de um grifo sobre preto é o exemplo. Quem
+    distingue é a vizinhança: o fundo é uma região contínua que chega até a
+    borda do quadro. Uma ilha da mesma cor, cercada de desenho, não é fundo.
+
+    Inundação a partir das quatro bordas, por vizinhança de quatro.
+    """
+    altura, largura = pixels.shape[:2]
+    candidato = np.sqrt(((pixels - fundo) ** 2).sum(axis=2)) < parecido
+    alcancado = np.zeros((altura, largura), dtype=bool)
+
+    plano = candidato.ravel()
+    visto = alcancado.ravel()
+    pilha: list[int] = []
+    for x in range(largura):
+        for y in (0, altura - 1):
+            i = y * largura + x
+            if plano[i] and not visto[i]:
+                visto[i] = True
+                pilha.append(i)
+    for y in range(altura):
+        for x in (0, largura - 1):
+            i = y * largura + x
+            if plano[i] and not visto[i]:
+                visto[i] = True
+                pilha.append(i)
+
+    while pilha:
+        i = pilha.pop()
+        y, x = divmod(i, largura)
+        if x > 0 and plano[i - 1] and not visto[i - 1]:
+            visto[i - 1] = True
+            pilha.append(i - 1)
+        if x < largura - 1 and plano[i + 1] and not visto[i + 1]:
+            visto[i + 1] = True
+            pilha.append(i + 1)
+        if y > 0 and plano[i - largura] and not visto[i - largura]:
+            visto[i - largura] = True
+            pilha.append(i - largura)
+        if y < altura - 1 and plano[i + largura] and not visto[i + largura]:
+            visto[i + largura] = True
+            pilha.append(i + largura)
+
+    return alcancado
+
+
+def abrir_bolsoes(
+    candidato: np.ndarray, alcancado: np.ndarray, maior_ilha: int,
+) -> np.ndarray:
+    """Devolve ao fundo as ilhas grandes cercadas pelo desenho.
+
+    A inundação não chega a um bolsão de fundo fechado pelo próprio desenho — o
+    vão entre o corpo e a asa de um grifo. Ele ficaria opaco, como se fosse
+    tinta. O que separa um bolsão de um detalhe é o tamanho: medido numa
+    ilustração, as duas ilhas de fundo tinham 11.716 e 2.726 pixels, e as 1.273
+    ilhas de traço escuro tinham todas menos de 500.
+    """
+    if maior_ilha <= 0:
+        return alcancado
+
+    altura, largura = candidato.shape
+    ilha = candidato & ~alcancado
+    plano = ilha.ravel()
+    saida = alcancado.ravel().copy()
+    visto = np.zeros(plano.size, dtype=bool)
+
+    for semente in np.flatnonzero(plano):
+        if visto[semente]:
+            continue
+        grupo = [semente]
+        visto[semente] = True
+        k = 0
+        while k < len(grupo):
+            i = grupo[k]
+            k += 1
+            y, x = divmod(i, largura)
+            for j, ok in (
+                (i - 1, x > 0), (i + 1, x < largura - 1),
+                (i - largura, y > 0), (i + largura, y < altura - 1),
+            ):
+                if ok and plano[j] and not visto[j]:
+                    visto[j] = True
+                    grupo.append(j)
+        if len(grupo) > maior_ilha:
+            saida[grupo] = True
+
+    return saida.reshape(altura, largura)
+
+
+def dilatar(mascara: np.ndarray, passos: int) -> np.ndarray:
+    """Engorda a máscara em `passos` pixels, por vizinhança de quatro."""
+    for _ in range(passos):
+        crescida = mascara.copy()
+        crescida[1:, :] |= mascara[:-1, :]
+        crescida[:-1, :] |= mascara[1:, :]
+        crescida[:, 1:] |= mascara[:, :-1]
+        crescida[:, :-1] |= mascara[:, 1:]
+        mascara = crescida
+    return mascara
+
+
 def separar(
     pixels: np.ndarray,
     papel: np.ndarray,
@@ -138,12 +244,27 @@ def separar(
     tolerancia: float = 30.0,
     suavidade: float = 60.0,
     resto: float = 0.0,
+    conectado: float = 0.0,
+    banda: int = 3,
+    maior_ilha: int = 0,
 ) -> tuple[np.ndarray, np.ndarray]:
     cobertura = (
         cobertura_chapada(pixels, papel, tolerancia, suavidade)
         if modo == 'chapado'
         else cobertura_aquarela(pixels, papel, limpar, ganho)
     )
+
+    if conectado > 0:
+        # A inundação decide *o que* é fundo; a rampa decide só a maciez da
+        # borda. Com o miolo protegido, a rampa pode ser larga sem comer o
+        # desenho — era essa a amarra que fazia o preto apagar a sobrancelha.
+        fora = fundo_conectado(pixels, papel, conectado)
+        if maior_ilha > 0:
+            candidato = np.sqrt(((pixels - papel) ** 2).sum(axis=2)) < conectado
+            fora = abrir_bolsoes(candidato, fora, maior_ilha)
+        faixa = dilatar(fora, banda) & ~fora
+        dentro = ~fora & ~faixa
+        cobertura = np.where(fora, 0.0, np.where(dentro, 1.0, cobertura))
 
     a = cobertura[..., None]
     with np.errstate(divide='ignore', invalid='ignore'):
@@ -210,6 +331,32 @@ def main() -> None:
              'borda ganha transparência parcial. Padrão: 60.',
     )
     parser.add_argument(
+        '--conectado',
+        type=float,
+        default=0.0,
+        metavar='DISTANCIA',
+        help='Só é fundo o que encosta na borda do quadro. O valor é a distância '
+             'de cor que ainda conta como fundo na inundação (ex.: 60). Protege '
+             'traço escuro dentro de desenho claro, que a cor sozinha apagaria. '
+             'Padrão: 0, desligado.',
+    )
+    parser.add_argument(
+        '--banda',
+        type=int,
+        default=3,
+        help='Largura, em pixels, da faixa de transição na borda quando '
+             '--conectado está ligado. Padrão: 3.',
+    )
+    parser.add_argument(
+        '--ilha',
+        type=int,
+        default=0,
+        metavar='PIXELS',
+        help='Só com --conectado: ilha de cor de fundo cercada pelo desenho, '
+             'maior que isto, volta a ser fundo. Serve para o vão entre o corpo '
+             'e a asa, que a inundação não alcança. Padrão: 0, nenhuma volta.',
+    )
+    parser.add_argument(
         '--resto',
         type=float,
         default=0.0,
@@ -225,6 +372,7 @@ def main() -> None:
     pigmento, cobertura = separar(
         pixels, papel, args.limpar, args.ganho,
         args.modo, args.tolerancia, args.suavidade, args.resto,
+        args.conectado, args.banda, args.ilha,
     )
 
     rgba = np.dstack([pigmento, cobertura * 255.0]).astype(np.uint8)

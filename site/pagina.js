@@ -24,6 +24,7 @@ const elementos = {
   campoQualidade: $('campoQualidade'), nome: $('nome'),
   papelHex: $('papelHex'), papelMostra: $('papelMostra'),
   modo: $('modo'), tolerancia: $('tolerancia'), suavidade: $('suavidade'), resto: $('resto'),
+  conectado: $('conectado'), parecido: $('parecido'), banda: $('banda'), ilha: $('ilha'),
   rotuloPapel: $('rotuloPapel'),
   btPapelAuto: $('btPapelAuto'), btConta: $('btConta'),
   btGravar: $('btGravar'), btOutra: $('btOutra'), btLarguraCheia: $('btLarguraCheia'),
@@ -109,6 +110,9 @@ function parametros() {
     tolerancia: Number(elementos.tolerancia.value),
     suavidade: Number(elementos.suavidade.value),
     resto: Number(elementos.resto.value) / 100,
+    conectado: elementos.conectado.checked ? Number(elementos.parecido.value) : 0,
+    banda: Number(elementos.banda.value),
+    maiorIlha: Number(elementos.ilha.value),
     saturacao: Number(elementos.saturacao.value) / 100,
     aparar: elementos.aparar.checked,
     limiar: Number(elementos.limiarCorte.value),
@@ -346,6 +350,9 @@ const rotulos = [
   ['tolerancia', 'vTolerancia', (v) => v],
   ['suavidade', 'vSuavidade', (v) => v],
   ['resto', 'vResto', (v) => `${v}%`],
+  ['parecido', 'vParecido', (v) => v],
+  ['banda', 'vBanda', (v) => `${v} px`],
+  ['ilha', 'vIlha', (v) => (Number(v) ? `acima de ${v} px` : 'desligado')],
 ];
 
 for (const [alvo, saida, formatar] of rotulos) {
@@ -363,8 +370,13 @@ function trocarModo() {
     campo.hidden = campo.dataset.modo !== modo;
   }
   elementos.rotuloPapel.textContent = modo === 'chapado' ? 'Cor do fundo' : 'Papel';
+  // Os dois controles da inundação só existem quando ela está ligada.
+  for (const campo of document.querySelectorAll('[data-conectado]')) {
+    campo.hidden = modo !== 'chapado' || !elementos.conectado.checked;
+  }
   aplicar();
 }
+elementos.conectado.addEventListener('change', trocarModo);
 elementos.modo.addEventListener('change', trocarModo);
 trocarModo();
 
