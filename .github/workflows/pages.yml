@@ -26,6 +26,11 @@ jobs:
 
       - name: Preparar o Pages
         uses: actions/configure-pages@v5
+        with:
+          # O repositorio nunca teve Pages ligado, e sem isto a acao nao acha o
+          # site para configurar. Com enablement ela cria o site na primeira
+          # execucao e nao faz nada nas seguintes.
+          enablement: true
 
       # A página é estática e não depende de build: sobe a pasta como está.
       - name: Enviar a pasta do site
