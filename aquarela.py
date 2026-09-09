@@ -88,18 +88,27 @@ def cobertura_chapada(
 
 
 def tirar_resto_do_fundo(
-    pigmento: np.ndarray, fundo: np.ndarray, cobertura: np.ndarray, forca: float,
+    pigmento: np.ndarray, fundo: np.ndarray, forca: float,
 ) -> np.ndarray:
     """Tira das bordas o resto do matiz do fundo.
 
     Num pixel de transição parte do que se vê é fundo, e quando a cobertura é
     subestimada sobra matiz: a franja verde na borda de um desenho sobre verde.
-    Remove-se do pigmento a componente de cor que aponta na direção do matiz do
-    fundo, deixando o brilho intacto.
 
-    A remoção é proporcional a `1 - cobertura`, e é isso que a torna segura: onde
-    a tinta é cheia não há fundo por baixo, e um ocre — que legitimamente contém
-    verde — sairia rosa se fosse tratado como franja.
+    Remove-se só a parte da cor que aponta para o matiz do fundo *mais forte do
+    que aponta para qualquer outro lado*. Decompondo a cor do pixel — sem o
+    brilho — numa componente ao longo do matiz do fundo e outra perpendicular a
+    ele, sai apenas o quanto a primeira excede a segunda.
+
+    É essa comparação que torna a remoção segura. Uma franja verde é quase toda
+    componente verde, e sai inteira. Um ocre também contém verde, mas contém
+    muito mais vermelho: a componente perpendicular é maior, o excesso é zero e
+    ele não é tocado. A tentativa anterior pesava a remoção por `1 - cobertura`
+    e não funcionava — com rampa apertada a borda já chega opaca, e o peso
+    zerava justamente onde a franja está.
+
+    O limite é inerente: uma cor *legitimamente* do matiz do fundo sai junto.
+    Não se recorta um desenho verde sobre fundo verde.
     """
     if forca <= 0:
         return pigmento
@@ -107,13 +116,17 @@ def tirar_resto_do_fundo(
     # Raiz da soma dos quadrados: np.linalg.norm escalona e nao casaria com o
     # nucleo do navegador no ultimo bit.
     norma = float(np.sqrt((direcao ** 2).sum()))
-    if norma < 1e-6:                        # fundo neutro: não há matiz a tirar
+    if norma < 1e-6:                        # fundo neutro: nao ha matiz a tirar
         return pigmento
     direcao = direcao / norma
-    cinza = pigmento.mean(axis=2, keepdims=True)
-    excesso = np.maximum(((pigmento - cinza) * direcao).sum(axis=2, keepdims=True), 0.0)
-    peso = (1.0 - cobertura)[..., None] * forca
-    return np.clip(pigmento - direcao * excesso * peso, 0, 255)
+
+    cor = pigmento - pigmento.mean(axis=2, keepdims=True)
+    ao_longo = (cor * direcao).sum(axis=2, keepdims=True)
+    perpendicular = np.sqrt(
+        np.maximum((cor ** 2).sum(axis=2, keepdims=True) - ao_longo ** 2, 0.0)
+    )
+    excesso = np.maximum(ao_longo - perpendicular, 0.0)
+    return np.clip(pigmento - direcao * excesso * forca, 0, 255)
 
 
 def separar(
@@ -137,7 +150,7 @@ def separar(
         pigmento = (pixels - papel * (1.0 - a)) / a
     pigmento = np.nan_to_num(pigmento, nan=0.0, posinf=255.0, neginf=0.0)
     pigmento = np.clip(pigmento, 0, 255)
-    return tirar_resto_do_fundo(pigmento, papel, cobertura, resto), cobertura
+    return tirar_resto_do_fundo(pigmento, papel, resto), cobertura
 
 
 def aparar(rgba: np.ndarray) -> np.ndarray:

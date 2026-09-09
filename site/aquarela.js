@@ -149,18 +149,21 @@ export function separar(dados, largura, altura, opcoes) {
       pig[c] = v;
     }
 
-    // Tira das bordas o resto do matiz do fundo. Proporcional a (1 - a), e é
-    // isso que a torna segura: onde a tinta é cheia não há fundo por baixo, e
-    // um ocre — que legitimamente contém verde — sairia rosa se fosse tratado
-    // como franja.
+    // Tira das bordas o resto do matiz do fundo: sai só a parte da cor que
+    // aponta para o matiz do fundo mais forte do que aponta para qualquer outro
+    // lado. Uma franja verde é quase toda componente verde e sai inteira; um
+    // ocre contém verde, mas contém muito mais vermelho, e não é tocado.
     if (o.resto > 0 && o.dir) {
       const cinza = (pig[0] + pig[1] + pig[2]) / 3;
-      const proj =
-        (pig[0] - cinza) * o.dir[0] + (pig[1] - cinza) * o.dir[1] + (pig[2] - cinza) * o.dir[2];
-      if (proj > 0) {
-        const peso = (1 - a) * o.resto * proj;
+      const c0 = pig[0] - cinza, c1 = pig[1] - cinza, c2 = pig[2] - cinza;
+      const aoLongo = c0 * o.dir[0] + c1 * o.dir[1] + c2 * o.dir[2];
+      const perp = Math.sqrt(
+        Math.max(c0 * c0 + c1 * c1 + c2 * c2 - aoLongo * aoLongo, 0),
+      );
+      const excesso = aoLongo - perp;
+      if (excesso > 0) {
         for (let c = 0; c < 3; c += 1) {
-          const v = pig[c] - o.dir[c] * peso;
+          const v = pig[c] - o.dir[c] * excesso * o.resto;
           pig[c] = v < 0 ? 0 : v > 255 ? 255 : v;
         }
       }

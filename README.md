@@ -31,9 +31,15 @@ Duas armadilhas que valem saber, porque são visíveis:
 - Medir por canal, em vez de por distância, faz um cinza neutro sobre verde
   parecer 40% tinta. Ao descontar 60% de verde, ele volta magenta. É a razão de
   o modo `chapado` não ser só um ajuste do outro.
-- Nas bordas sobra matiz do fundo — a franja verde. `--resto` a remove, mas só
-  onde a cobertura é parcial: no miolo opaco não há fundo por baixo, e um ocre,
-  que legitimamente contém verde, sairia rosa se fosse tratado como franja.
+- Nas bordas sobra matiz do fundo — a franja verde. `--resto` remove só a parte
+  da cor que aponta para o matiz do fundo **mais forte do que aponta para
+  qualquer outro lado**: decompõe-se a cor do pixel, sem o brilho, numa
+  componente ao longo do matiz do fundo e outra perpendicular, e sai apenas o
+  quanto a primeira excede a segunda. Uma franja verde é quase toda componente
+  verde e sai inteira; um ocre contém verde, mas contém muito mais vermelho, e
+  não é tocado. Medido no grifo: 92–98% do verde das franjas removido, 0% do
+  ocre, do tan e do marrom. O limite é inerente — uma cor legitimamente do
+  matiz do fundo sai junto, e não se recorta desenho verde sobre fundo verde.
 
 ## Duas maneiras de usar
 
@@ -118,6 +124,32 @@ tinta escura com muita. A informação não existe.
 Lendo as colunas, um fundo de cor saturada serve para tudo: o **verde** é o mais
 constante dos seis (pior caso 7,7), com o azul logo atrás. Branco e preto são
 ótimos ou péssimos conforme a criatura.
+
+### O que esse ensaio não vê: o detalhe interno
+
+O ensaio acima pinta a criatura com um degradê liso, e por isso não enxerga o
+que mais dói na prática — **detalhe escuro dentro de uma criatura clara**. Um
+fundo acromático separa por brilho, e a criatura ocupa a faixa toda de brilho:
+o que estiver perto do fundo some, esteja no meio do desenho ou não.
+
+Medindo num par real — a mesma ilustração sobre preto e sobre cinza, de onde se
+extraem os pixels de interior opaco —, a fração do interior que o algoritmo
+apagaria com rampa apertada (tolerância 15, suavidade 40):
+
+| preto | cinza | branco | verde | azul | magenta |
+|---|---|---|---|---|---|
+| 0,5% | 12,7% | 20,4% | **0,0%** | **0,0%** | **0,0%** |
+
+Um fundo de cor saturada não apaga **nada** do interior, porque a separação é
+por matiz e a criatura, sendo creme e marrom, não tem matiz de fundo nenhum —
+seja ela clara ou escura. O cinza é o pior dos acromáticos para uma criatura
+creme: muitos tons dela caem perto do cinza médio.
+
+Daí uma diferença prática que a tabela de erro não mostra: **o verde perdoa, o
+preto é preciso mas sensível**. Com rampa larga demais (suavidade 100), o preto
+esvazia a sobrancelha e os traços escuros; com rampa apertada, acerta. O verde
+dá o mesmo resultado numa faixa larga de parâmetros — ao custo da franja, que o
+`--resto` agora resolve.
 
 Uma ressalva que o número não mede: **papel claro é o único fundo que devolve
 aquarela de verdade**, translúcida, com os brancos sendo papel. Se a ilustração
