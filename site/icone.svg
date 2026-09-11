@@ -1,0 +1,26 @@
+<!-- Uma gota de aguada perdendo o papel: em cima o pigmento assentado, embaixo
+     ele fica translucido e o xadrez aparece por baixo — o mesmo xadrez que a
+     pagina usa para dizer "aqui nao ha papel". E o que a ferramenta faz.
+     O apple-touch-icon.png sai daqui, sem o arredondamento: o iOS poe a
+     mascara dele por cima. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="180" height="180" viewBox="0 0 180 180">
+  <defs>
+    <clipPath id="g"><path d="M90 26 C110 52 132 74 132 100 C132 127 113 146 90 146 C67 146 48 127 48 100 C48 74 70 52 90 26 Z"/></clipPath>
+    <pattern id="x" width="44" height="44" patternUnits="userSpaceOnUse">
+      <rect width="44" height="44" fill="#fdfaf5"/>
+      <rect width="22" height="22" fill="#d9d0be"/>
+      <rect x="22" y="22" width="22" height="22" fill="#d9d0be"/>
+    </pattern>
+    <linearGradient id="a" x1="0" y1="0.12" x2="0" y2="1">
+      <stop offset="0" stop-color="#8a5450" stop-opacity="1"/>
+      <stop offset="0.4" stop-color="#8a5450" stop-opacity="0.9"/>
+      <stop offset="1" stop-color="#8a5450" stop-opacity="0.06"/>
+    </linearGradient>
+  </defs>
+  <rect width="180" height="180" rx="38" fill="#f6f1e6"/>
+  <g clip-path="url(#g)">
+    <rect width="180" height="180" fill="url(#x)"/>
+    <rect width="180" height="180" fill="url(#a)"/>
+  </g>
+  <path d="M90 26 C110 52 132 74 132 100 C132 127 113 146 90 146 C67 146 48 127 48 100 C48 74 70 52 90 26 Z" fill="none" stroke="#683832" stroke-width="2.5" stroke-opacity=".55" stroke-linejoin="round"/>
+</svg>
